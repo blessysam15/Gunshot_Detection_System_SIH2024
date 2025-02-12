@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Direction and Elevation Update</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+      .content-wrapper {
+        display: flex;
+        justify-content: space-between;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .direction-section {
+        flex: 1;
+        margin-right: 20px;
+      }
+
+      .elevation-section {
+        flex: 1;
+        margin-left: 20px;
+      }
+
+      .compass {
+        position: relative;
+        width: 320px;
+        height: 320px;
+        border-radius: 50%;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+        margin: auto;
+      }
+
+      .compass > .arrow {
+        position: absolute;
+        width: 0;
+        height: 0;
+        top: 0;
+        left: 44%;
+        transform-origin: 50% 160px;
+        transform: rotate(0deg);
+        border-style: solid;
+        border-width: 30px 20px 0 20px;
+        border-color: red transparent transparent transparent;
+        z-index: 1;
+        transition: transform 1s ease-in-out;
+      }
+
+      .compass > .compass-circle {
+        position: absolute;
+        width: 80%;
+        height: 80%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: url(https://purepng.com/public/uploads/large/purepng.com-compasscompassinstrumentnavigationcardinal-directionspointsdiagram-1701527842316onq7x.png)
+          center no-repeat;
+        background-size: contain;
+      }
+
+      .controls {
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .controls input {
+        width: 100px;
+        padding: 5px;
+        margin-right: 10px;
+      }
+
+      .controls button {
+        padding: 5px 10px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .controls button:hover {
+        background-color: #0056b3;
+      }
+
+      .card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        height: 550px;
+      }
+
+      /* Elevation Meter Styles */
+      .elevation-meter {
+        position: relative;
+        width: 320px;
+        height: 160px;
+        background-color: #f5f5f5;
+        border-radius: 160px 160px 0 0;
+        margin: 20px auto;
+        overflow: hidden;
+        transform: rotate(90deg);
+        transform-origin: center;
+        margin-top: 100px;
+        margin-bottom: 100px;
+      }
+
+      .elevation-arm {
+        position: absolute;
+        width: 4px;
+        height: 140px;
+        background-color: #000;
+        bottom: 10px;
+        left: 50%;
+        transform-origin: bottom center;
+        transform: translateX(-50%) rotate(0deg);
+        transition: transform 0.3s ease-in-out;
+      }
+
+      .elevation-pointer {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background-color: red;
+        border-radius: 50%;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .elevation-markings {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+      }
+
+      .marking {
+        position: absolute;
+        width: 1px;
+        height: 20px;
+        background-color: black;
+        transform-origin: bottom center;
+        text-align: center;
+        font-size: 10px;
+        color: black;
+      }
+
+      /* Gun Type Section Styles */
+      #guntype-section .card,
+      #enemy-section .card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        height: 550px;
+        position: relative;
+      }
+
+      #guntype-section h2,
+      #enemy-section h2 {
+        margin: 0;
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-size: 25px;
+        font-weight: bold;
+        color: #333;
+      }
+
+      #guntype-section .inner-card {
+        height: 100px;
+        background-color: #e4e4e4;
+        border: 1px solid #bbb;
+        padding: 10px;
+        display: flex;
+        align-items: center;
+      }
+
+      #guntype-section .predicted-label-card,
+      #enemy-section .map-container {
+        flex: 1;
+        background-color: #e4e4e4;
+        border: 1px solid #bbb;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #map {
+        height: calc(100% - 80px);
+        width: calc(100% - 40px);
+        margin: 40px 20px 20px;
+        border: 1px solid #ddd;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="content-wrapper">
+      <!-- Direction Section -->
+      <div class="direction-section">
+        <div class="card">
+          <h2>DIRECTION</h2>
+          <div class="compass">
+            <div class="arrow"></div>
+            <div class="compass-circle"></div>
+          </div>
+          <div class="controls">
+            <label for="direction">Azimuthal Angle (°):</label>
+            <input type="number" id="direction" placeholder="Enter angle" />
+            <button id="set-direction">Set Direction</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Elevation Section -->
+      <div class="elevation-section">
+        <div class="card">
+          <h2>ELEVATION</h2>
+          <div class="elevation-meter">
+            <div class="elevation-markings"></div>
+            <div class="elevation-arm">
+              <div class="elevation-pointer"></div>
+            </div>
+          </div>
+          <div class="controls">
+            <label for="elevation">Elevation Angle (°):</label>
+            <input
+              type="number"
+              id="elevation"
+              placeholder="Enter angle"
+              min="-90"
+              max="90"
+            />
+            <button id="set-elevation">Set Elevation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-wrapper">
+      <!-- Gun Type Section -->
+      <div id="guntype-section" class="content-wrapper" style="width: 50%;">
+        <div class="card" style="width: 100%;">
+          <h2>GUN TYPE</h2>
+          <div style="display: flex; gap: 20px; margin-top: 50px; height: calc(100% - 70px);">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; height: 100%;">
+              <div class="inner-card">
+                <p style="margin: 0;"><strong>Timestamp:</strong> <span id="timestamp">Loading...</span></p>
+              </div>
+              <div class="predicted-label-card">
+                <p><strong>PREDICTED GUN-TYPE:</strong> <span id="predictedLabel">Loading...</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Enemy Localization Section -->
+      <div id="enemy-section" class="content-wrapper" style="width: 50%;">
+        <div class="card" style="width: 100%;">
+          <h2>ENEMY LOCALIZATION</h2>
+          <div id="map"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+      const arrow = document.querySelector(".arrow");
+      const setDirectionBtn = document.getElementById("set-direction");
+      const directionInput = document.getElementById("direction");
+      const elevationInput = document.getElementById("elevation");
+      const setElevationBtn = document.getElementById("set-elevation");
+      const elevationArm = document.querySelector(".elevation-arm");
+
+      // Function to fetch azimuth angle from /direction route and update arrow rotation
+      async function fetchAndUpdateDirection() {
+        try {
+          const response = await fetch("/direction");
+          const data = await response.json();
+
+          if (data.azimuth !== undefined) {
+            const azimuth = parseFloat(data.azimuth);
+            arrow.style.transform = `rotate(${azimuth}deg)`; // Rotate arrow around compass
+            directionInput.value = azimuth; // Update input field with the fetched angle
+          }
+        } catch (error) {
+          console.error("Error fetching direction data:", error);
+        }
+      }
+
+      function setDirection() {
+        const angle = parseFloat(directionInput.value);
+        if (!isNaN(angle)) {
+          arrow.style.transform = `rotate(${angle}deg)`;
+        }
+      }
+
+      // Generate markings for the protractor
+      function generateMarkings() {
+        const markings = document.querySelector(".elevation-markings");
+        for (let i = -90; i <= 90; i += 10) {
+          const marking = document.createElement("div");
+          marking.classList.add("marking");
+          marking.style.transform = `rotate(${i}deg) translateY(-140px)`;
+
+          // Add text only for every 30°
+          if (i % 30 === 0) {
+            const text = document.createElement("span");
+            text.textContent = i;
+            text.style.position = "absolute";
+            text.style.transform = "translate(-6px,20px)";
+            text.style.fontSize = "10px";
+            text.style.color = "black";
+            marking.appendChild(text);
+          }
+
+          markings.appendChild(marking);
+        }
+      }
+
+      // Elevation functions
+      function setElevation() {
+        let degrees = parseFloat(elevationInput.value) || 0;
+        degrees = Math.max(-90, Math.min(90, degrees)); // Clamp to [-90, 90]
+
+        // Rotate the elevation arm
+        elevationArm.style.transform = `translateX(-50%) rotate(${degrees}deg)`;
+
+        // Update input field to the valid value
+        elevationInput.value = degrees;
+      }
+
+      // Event listeners
+      setElevationBtn.addEventListener("click", setElevation);
+
+      elevationInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          setElevation();
+        }
+      });
+
+      // Initialize
+      setDirectionBtn.addEventListener("click", setDirection);
+
+      setInterval(fetchAndUpdateDirection, 500);
+      generateMarkings();
+
+      // Enemy Localization Map Script
+      const map = L.map('map').setView([12.847199251049776, 80.051795], 13);
+ 
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'Map data © <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+      }).addTo(map);
+ 
+      const troopMarker = L.marker([12.847199251049776, 80.04318885282306])
+        .addTo(map)
+        .bindPopup('Point 1: Troop')
+        .openPopup();
+ 
+      let enemyMarker = null;
+ 
+      async function updateEnemyLocation() {
+        try {
+          const response = await fetch('http://192.168.122.237:5000/detection');
+          if (!response.ok) throw new Error('Failed to fetch detection data');
+          const data = await response.json();
+ 
+          const latitude = parseFloat(data.latitude);
+          const longitude = parseFloat(data.longitude);
+ 
+          if (enemyMarker) {
+            map.removeLayer(enemyMarker);
+          }
+ 
+          enemyMarker = L.marker([latitude, longitude])
+            .addTo(map)
+            .bindPopup('Point 2: Enemy Detected<br>Lat: ' + latitude + '<br>Lon: ' + longitude)
+            .openPopup();
+ 
+          map.setView([latitude, longitude], 13);
+        } catch (error) {
+          console.error('Error updating enemy location:', error);
+        }
+      }
+ 
+      setInterval(updateEnemyLocation, 10000);
+      updateEnemyLocation();
+    </script>
+  </body>
+</html>
